@@ -56,5 +56,18 @@ while True:
     if not question:
         continue
     
+ # Interactive chat bot - initial pass
+#    response = query_engine.query(question)
+#    print(f"\nAssistant: {response}\n")
+
     response = query_engine.query(question)
     print(f"\nAssistant: {response}\n")
+    
+    # Show source citations
+    if response.source_nodes:
+        print("📎 Sources:")
+        for node in response.source_nodes:
+            filename = node.metadata.get("file_name", "unknown")
+            score = round(node.score, 3) if node.score else "N/A"
+            print(f"  - {filename} (relevance score: {score})")
+        print()
