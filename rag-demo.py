@@ -1,69 +1,82 @@
 import os
 from dotenv import load_dotenv
 from llama_index.core import VectorStoreIndex, SimpleDirectoryReader
+from llama_index.core.vector_stores import MetadataFilter, MetadataFilters
 
-# Load your API key from .env
+# Load API key
 load_dotenv()
 os.environ["OPENAI_API_KEY"] = os.getenv("OPENAI_API_KEY")
 
-# Load documents from a folder called 'data'
-# documents = SimpleDirectoryReader("data").load_data()
-
-# Load all documents from data folder
+# Load all documents with metadata
 print("Loading documents...")
-documents = SimpleDirectoryReader("data").load_data()
-print(f"Loaded {len(documents)} document(s)")
+documents = SimpleDirectoryReader("data", filename_as_id=True).load_data()
 
-# Build the index (this is the RAG "retrieval" part)
-# index = VectorStoreIndex.from_documents(documents)
+# Tag each document with its filename as metadata
+for doc in documents:
+    doc.metadata["file_name"] = os.path.basename(doc.metadata["file_path"])
+
+print(f"Loaded {len(documents)} document(s):")
+for doc in documents:
+    print(f"  - {doc.metadata['file_name']}")
 
 # Build index
-print("Building index...")
+print("\nBuilding index...")
 index = VectorStoreIndex.from_documents(documents)
-# Create a query engine
-query_engine = index.as_query_engine()
 
-# Ask it a question
-# response = query_engine.query("What is this document about?")
-# print(response)
-# response = query_engine.query("What companies has this person worked for and what were their roles?")
-# print(response)
-# response = query_engine.query("What are this person's AI and data engineering skills?")
-# print(response)
-# response = query_engine.query("What quantifiable results has this person achieved?")
-# print(response)
-# response = query_engine.query("How would this person approach AI governance in a regulated environment?")
-# print(response)
+# Document menu
+doc_map = {
+    "1": "resume.txt",
+    "2": "job_description.txt",
+    "3": "job_description_2.txt",
+    "all": None
+}
 
+print("\n✅ Ready!")
+print("\nAvailable document filters:")
+print("  1 - Resume only")
+print("  2 - Job Description 1 only")
+print("  3 - Job Description 2 only")
+print("  all - All documents")
+print("\nType 'quit' to exit.\n")
 
-# Create query engine with source citations
-query_engine = index.as_query_engine(
-    similarity_top_k=3,
-    response_mode="compact"
-)
-
-print("\n✅ Ready! Ask questions about your documents.")
-print("Type 'quit' to exit.\n")
-
-# Interactive chat loop
 while True:
-    question = input("You: ").strip()
+    # Ask which document to filter on
+    doc_choice = input("Filter by document (1/2/3/all): ").strip().lower()
     
-    if question.lower() in ["quit", "exit", "q"]:
+    if doc_choice in ["quit", "exit", "q"]:
         print("Exiting. Good work today!")
         break
+        
+    if doc_choice not in doc_map:
+        print("Invalid choice. Please enter 1, 2, 3, or all.")
+        continue
+    
+    # Build query engine with or without filter
+    selected_file = doc_map[doc_choice]
+    
+    if selected_file:
+        filters = MetadataFilters(filters=[
+            MetadataFilter(key="file_name", value=selected_file)
+        ])
+        query_engine = index.as_query_engine(
+            similarity_top_k=3,
+            filters=filters
+        )
+        print(f"\n🔍 Filtering to: {selected_file}")
+    else:
+        query_engine = index.as_query_engine(similarity_top_k=3)
+        print(f"\n🔍 Searching all documents")
+    
+    # Ask question
+    question = input("You: ").strip()
     
     if not question:
         continue
     
- # Interactive chat bot - initial pass
-#    response = query_engine.query(question)
-#    print(f"\nAssistant: {response}\n")
-
     response = query_engine.query(question)
     print(f"\nAssistant: {response}\n")
     
-    # Show source citations
+    # Show citations
     if response.source_nodes:
         print("📎 Sources:")
         for node in response.source_nodes:
